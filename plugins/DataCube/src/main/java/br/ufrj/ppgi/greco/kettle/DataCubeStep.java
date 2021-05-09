@@ -1,5 +1,7 @@
 package br.ufrj.ppgi.greco.kettle;
 
+import java.util.List;
+
 import org.pentaho.di.core.exception.KettleException;
 import org.pentaho.di.core.exception.KettleStepException;
 import org.pentaho.di.core.row.RowDataUtil;
@@ -14,159 +16,318 @@ import org.pentaho.di.trans.step.StepMetaInterface;
 
 import br.ufrj.ppgi.greco.kettle.plugin.tools.datatable.DataTable;
 
-public class DataCubeStep extends BaseStep implements StepInterface {
+public class DataCubeStep extends BaseStep implements
+        StepInterface
+{
 
-	int i = 0;
-	public static final String OBJ = "exProp:%s ex:%s;";
-	
-	public DataCubeStep(StepMeta stepMeta, StepDataInterface stepDataInterface, int copyNr, TransMeta transMeta,
-			Trans trans) {
-		super(stepMeta, stepDataInterface, copyNr, transMeta, trans);
-	}
+	int j = 0;
+    public DataCubeStep(StepMeta stepMeta,
+            StepDataInterface stepDataInterface, int copyNr,
+            TransMeta transMeta, Trans trans)
+    {
+        super(stepMeta, stepDataInterface, copyNr, transMeta, trans);
+    }
 
-	@Override
-	public boolean init(StepMetaInterface smi, StepDataInterface sdi) {
-		if (super.init(smi, sdi)) {
-			return true;
-		} else
-			return false;
-	}
+    @Override
+    public boolean init(StepMetaInterface smi, StepDataInterface sdi)
+    {
+        if (super.init(smi, sdi))
+        {
+            // TODO init something here if needed
+            // ...
+            return true;
+        }
+        else
+            return false;
+    }
 
-	@Override
-	public void dispose(StepMetaInterface smi, StepDataInterface sdi) {
-		super.dispose(smi, sdi);
-	}
+    @Override
+    public void dispose(StepMetaInterface smi, StepDataInterface sdi)
+    {
+        super.dispose(smi, sdi);
 
-	private String formatUri(String uri) {
-		return "<" + uri + ">";
-	}
+        // TODO finalize something here if needed
+        // ...
+    }
 
-	private String formatPrefix(String prefix) {
-		if (!prefix.equals("@base")){
-			return "@prefix " + prefix + ":";
-		}else {
-			return prefix;
-		}
-	}
+    /**
+     * Metodo chamado para cada linha que entra no step
+     */
+    public boolean processRow(StepMetaInterface smi, StepDataInterface sdi)
+            throws KettleException
+    {
 
-	/**
-	 * Método chamado para cada linha que entra no step
-	 */
-	public boolean processRow(StepMetaInterface smi, StepDataInterface sdi) throws KettleException {
+        DataCubeStepMeta meta = (DataCubeStepMeta) smi;
+        DataCubeStepData data = (DataCubeStepData) sdi;
 
-		DataCubeStepMeta meta = (DataCubeStepMeta) smi;
-		DataCubeStepData data = (DataCubeStepData) sdi;
-				
-		Object[] row = getRow();
-		if (row == null) {
-			setOutputDone();
-			return false;
-		}
-		
-		if (first) {
-			first = false;
+        // Obtem linha do fluxo de entrada e termina caso nao haja mais entrada
+        Object[] row = getRow();
+        if (row == null)
+        { // N�o h� mais linhas de dados
+            setOutputDone();
+            return false;
+        }
 
-			RowMetaInterface rowMeta = getInputRowMeta();
-			data.outputRowMeta = rowMeta.clone();
+        if (first)
+        { // Executa apenas uma vez. Variavel first definida na superclasse
+            first = false;
 
-			// Adiciona os metadados do step atual
-			meta.getFields(data.outputRowMeta, getStepname(), null, null, this);
+            // Obtem todas as colunas at� o step anterior.
+            // Chamar apenas apos chamar getRow()
+            RowMetaInterface rowMeta = getInputRowMeta();
+            data.outputRowMeta = rowMeta.clone();
 
-			DataTable<String> vocabularyTable = meta.getVocabularyTable();
-			for (int k = 0; k < vocabularyTable.size(); k++) {
-				String prefix = vocabularyTable.getValue(k, DataCubeStepMeta.Field.VOCABULARY_TABLE_PREFIX.name());
-				String uri = vocabularyTable.getValue(k, DataCubeStepMeta.Field.VOCABULARY_TABLE_URI.name());
-				putOutRow(row, meta, data, this.formatPrefix(prefix) + " " + this.formatUri(uri) + " .");
-			}
+            // Adiciona os metadados do step atual
+            meta.getFields(data.outputRowMeta, getStepname(), null, null, this);
 
-			putOutRow(row, meta, data, "", 
-					"<http://purl.org/linked-data/cube> a owl:Ontology ;", 
-					"rdfs:label \"Example DataCube Knowledge Base\" ;",
-					"dc:description \"This knowledgebase contains one Data Structure Definition with one Data Set. This Data Set has a couple of Components and Observations.\" .",
-					"", 
-					"# Data Structure Definitions", 
-					"", 
-					"ex:dsd a cube:DataStructureDefinition ;",
-					"    rdfs:label \"A Data Structure Definition\"@en ;",
-					"    rdfs:comment \"Defines the structure of a DataSet or slice.\" ;");
+            // TODO Outras operacoes que devem ser executadas apenas uma vez
+            DataTable<String> table = meta.getMapTable();
 
-			DataTable<String> dimensionTable = meta.getDimensionTable();
-			for (int k = 0; k < dimensionTable.size(); k++) {
-				String dimURI = dimensionTable.getValue(k, DataCubeStepMeta.Field.DIMENSION_TABLE_URI.name());
-				if (k == 0) {
-					putOutRow(row, meta, data, "    cube:component  " + this.formatUri(dimURI) + ",");
-				} else if (k == dimensionTable.size() - 1) {
-					putOutRow(row, meta, data, "      " + this.formatUri(dimURI) + " .");
-				} else {
-					putOutRow(row, meta, data, "      " + this.formatUri(dimURI) + ",");
-				}
-			}
+            //Prefixos
+            String prefix = meta.getPrefixes().toString();
+            prefix = prefix.replace("[","");
+            prefix = prefix.replace(", "," <");
+            prefix = prefix.replace("]",">. ");
+            prefix = prefix.replace("<@","@");
+            prefix = prefix.replace(">. >.",">.");
+            prefix = prefix.replace(" <>.  ","");
+            prefix = prefix.replace(".  ","."+System.getProperty("line.separator")); 
 
-			putOutRow(row, meta, data, "", "# Component Specifications", "");
+            putOutRow(row, meta, data, prefix);
+            
+            String prefix_base = prefix.substring(prefix.indexOf(" ")+1, prefix.indexOf("."+System.getProperty("line.separator")));
+            
+            putOutRow(row, meta, data, "");
+            putOutRow(row, meta, data, prefix_base+" a owl:Ontology ;");
+            putOutRow(row, meta, data, "	rdfs:label \"Example DataCube Knowledge Base\" ;");
+            putOutRow(row, meta, data, "	dc:description \"This knowledgebase contains one Data Structure Definition with one Data Set. This Data Set has a couple of Components and Observations.\" .");
+            putOutRow(row, meta, data, "");
+            putOutRow(row, meta, data, "#");
+            putOutRow(row, meta, data, "# Data Structure Definitions");
+            putOutRow(row, meta, data, "#");
+            putOutRow(row, meta, data, "");
+            putOutRow(row, meta, data, "ex:dsd a cube:DataStructureDefinition ;");
+            putOutRow(row, meta, data, "	rdfs:label \"A Data Structure Definition\"@en ;");
+            putOutRow(row, meta, data, "	rdfs:comment \"Defines the structure of a DataSet or slice.\" ;");
 
-			for (int k = 0; k < dimensionTable.size(); k++) {
-				String label = dimensionTable.getValue(k, DataCubeStepMeta.Field.DIMENSION_TABLE_LABEL.name());
-				String dimURI = dimensionTable.getValue(k, DataCubeStepMeta.Field.DIMENSION_TABLE_URI.name());
-				String dimName = dimensionTable.getValue(k, DataCubeStepMeta.Field.DIMENSION_TABLE_NAME.name());
-				putOutRow(row, meta, data, 
-						this.formatUri(dimURI) + " a cube:ComponentSpecification ;",
-						"    rdfs:label \"" + label + "\" ;", 
-						"    cube: cube:dimension exProp:" + dimName + " .", "");
-			}
+         
+            // Dimension components
+            table = meta.getMapTable();
+            for (int i = 0; i < table.size(); i++)
+            {
+            	String dimensionURI = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_URI_FIELD_NAME.name());	
+            	if(dimensionURI != null){
+            		if (i!=0){ putOutRow(row, meta, data, "	"+"<"+removeSignals(dimensionURI).toLowerCase()+">,");}
+            		else {putOutRow(row, meta, data, "	"+"cube:component "+"	"+"<"+removeSignals(dimensionURI).toLowerCase()+">,");}
+            	}
+            }
+            
+            // Measure components
+            table = meta.getMapTable1();
+            for (int i = 0; i < table.size(); i++)
+            {
+            	String measureURI = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_MEASURE_URI_FIELD_NAME.name());	
+            	if(measureURI != null){
+            		putOutRow(row, meta, data, "	"+"<"+removeSignals(measureURI).toLowerCase()+">,");
+            	}
+            }
+            
+            
+            putOutRow(row, meta, data, "	<http://www.w3.org/2001/XMLSchema#string> .");
+            putOutRow(row, meta, data, "");
+            putOutRow(row, meta, data, "#");
+            putOutRow(row, meta, data, "# Component Specifications");
+            putOutRow(row, meta, data, "#");
+            putOutRow(row, meta, data, "");
 
-			putOutRow(row, meta, data, "# Data Set",
-					"rdfs:label \"A DataSet\"^^<http://www.w3.org/2001/XMLSchema#string> ;",
-					"rdfs:comment \"Represents a collection of observations and conforming to some common dimensional structure.\" ;",
-					"cube:structure ex:dsd .", "", "# Dimensions, Unit and Measure");
+            table = meta.getMapTable();
+            for (int i = 0; i < table.size(); i++)
+            {
+            	String dimensionField = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_DIMENSIONS_FIELD_NAME.name());
+            	String uriDimensao = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_URI_FIELD_NAME.name());
+            	String labelDimensao = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_LABELS_FIELD_NAME.name());
+            	if (dimensionField != null && uriDimensao != null ){
+            		putOutRow(row, meta, data, "<"+removeSignals(uriDimensao).toLowerCase()+"> a cube:ComponentSpecification ;");
+            		putOutRow(row, meta, data, "	rdfs:label \"" + labelDimensao + "\" ;");
+            		String dimensionURIType = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_URI_TYPE_FIELD_NAME.name());
+            		if (!dimensionURIType.isEmpty()){
+            			putOutRow(row, meta, data, "	owl:sameAs "+ "<" + dimensionURIType + "> ;");
+            		}
+            		putOutRow(row, meta, data, "	cube:dimension exProp:" + removeSignals(dimensionField).toLowerCase() + ".");
+            		putOutRow(row, meta, data, "");
+            	}       
+            }
+            	
+            putOutRow(row, meta, data, "<http://www.w3.org/2001/XMLSchema#float> a cube:ComponentSpecification ;");
+            putOutRow(row, meta, data, "	rdfs:label \"Component Specification of Unit\" ;");
+            putOutRow(row, meta, data, "	cube:attribute exProp:unit .");
+            putOutRow(row, meta, data, "");
+            
+            table = meta.getMapTable1();
+            for (int i = 0; i < table.size(); i++)
+            {
+            	String measureField = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_MEASURE_FIELD_NAME.name());
+            	String uriMedida = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_MEASURE_URI_FIELD_NAME.name());
+            	String labelMedida = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_MEASURE_LABEL_FIELD_NAME.name());
+            	if (uriMedida != null && measureField != null ){
+            		putOutRow(row, meta, data, "<"+uriMedida+"> a cube:ComponentSpecification ;");
+            		putOutRow(row, meta, data, "	rdfs:label \"" + labelMedida + "\" ;");
+            		String measureURIType = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_MEASURE_URI_TYPE_FIELD_NAME.name());
+            		if (!measureURIType.isEmpty()){
+            			putOutRow(row, meta, data, "	owl:sameAs "+ "<" + measureURIType + "> ;");
+            		}
+            		putOutRow(row, meta, data, "	cube:measure exProp:" + removeSignals(measureField).toLowerCase() + ".");
+            		putOutRow(row, meta, data, "");
+            	}       
+            }
+            
+            
+            putOutRow(row, meta, data, "#");
+            putOutRow(row, meta, data, "# Data Set");
+            putOutRow(row, meta, data, "#");
+            putOutRow(row, meta, data, "ex:dataset a cube:DataSet ;");
+            putOutRow(row, meta, data, "	rdfs:label \"A DataSet\"^^<http://www.w3.org/2001/XMLSchema#string> ;");
+            putOutRow(row, meta, data, "	rdfs:comment \"Represents a collection of observations and conforming to some common dimensional structure.\" ;");
+            putOutRow(row, meta, data, "	cube:structure ex:dsd .");
+            putOutRow(row, meta, data, "");
+            putOutRow(row, meta, data, "#");
+            putOutRow(row, meta, data, "# Dimensions, Unit and Measure");
+            putOutRow(row, meta, data, "#");
 
-			for (int k = 0; k < dimensionTable.size(); k++) {
-				String type = dimensionTable.getValue(k, DataCubeStepMeta.Field.DIMENSION_TABLE_TYPE.name());
-				String label = dimensionTable.getValue(k, DataCubeStepMeta.Field.DIMENSION_TABLE_LABEL.name());
-				String dimName = dimensionTable.getValue(k, DataCubeStepMeta.Field.DIMENSION_TABLE_NAME.name());
-				if (type.trim().equals("")) { // it's not a measure
-					putOutRow(row, meta, data, 
-							"exProp:" + dimName + " a cube:DimensionProperty ;",
-							"    rdfs:label \"" + label + "\"@en .", "");
-				} else {
-					putOutRow(row, meta, data, "exProp:unit a cube:AttributeProperty ;",
-							"    exProp:" + dimName + " a cube:MeasureProperty ;", 
-							"    rdfs:label \"" + label + "\"@en .", "");
-				}
-			}
+            table = meta.getMapTable();
+            for (int i = 0; i < table.size(); i++)
+            {
+            	String dimensionField = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_DIMENSIONS_FIELD_NAME.name());
+            	String labelDimensao = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_LABELS_FIELD_NAME.name());
+            	if (dimensionField != null){    		
+            		putOutRow(row, meta, data, "exProp:" + removeSignals(dimensionField).toLowerCase() + " a cube:DimensionProperty ;");
+            		putOutRow(row, meta, data, "	rdfs:label \"" + labelDimensao + "\"@en .");
+            		putOutRow(row, meta, data, "");
+            	}       
+            }
+            
+            putOutRow(row, meta, data, "exProp:unit a cube:AttributeProperty ;");
+            putOutRow(row, meta, data, "	rdfs:label \"Unit\" .");
+            putOutRow(row, meta, data, "");
+            
+            table = meta.getMapTable1();
+            for (int i = 0; i < table.size(); i++)
+            {
+            	String measureField = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_MEASURE_FIELD_NAME.name());
+            	String labelMedida = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_MEASURE_LABEL_FIELD_NAME.name());
+            	if (measureField != null ){            		
+            		putOutRow(row, meta, data, "exProp:" + removeSignals(measureField).toLowerCase() + " a cube:MeasureProperty ;");
+            		putOutRow(row, meta, data, "	rdfs:label \"" + labelMedida + "\" .");
+            		putOutRow(row, meta, data, "");
+            	}       
+            }
+            
+            table = meta.getMapTable2();
+            
+            if (!"".equals(DataCubeStepMeta.Field.MAP_TABLE_HIERARCHY_FIELD_NAME.name())){
+            	
+                putOutRow(row, meta, data, "#");
+                putOutRow(row, meta, data, "# HIERARCHYS");
+                putOutRow(row, meta, data, "#");
+                
+                putOutRow(row, meta, data, ""); 
+            
+	            for (int i = 0; i < table.size(); i++)
+	            {
+	            	String hierarquia = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_HIERARCHY_FIELD_NAME.name());
+	            	String hierarquiaDe = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_HIERARCHY_DE_FIELD_NAME.name());
+	            	String hierarquiaLabel = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_HIERARCHY_LABEL_FIELD_NAME.name());
+	            	String hierarquiaPara = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_HIERARCHY_PARA_FIELD_NAME.name());
+	            	if (hierarquia != null && hierarquiaDe != null && hierarquiaPara != null ){            		
+	            		putOutRow(row, meta, data, "ex:" + removeSignals(hierarquiaDe).toLowerCase() + " a ex:" + removeSignals(hierarquia).toLowerCase() + " ;");
+	            		putOutRow(row, meta, data, "	obo:part_of ex:" + removeSignals(hierarquiaPara) + ";");
+	            		putOutRow(row, meta, data, "	rdfs:label \"" + hierarquiaLabel + "\"@en .");
+	            		putOutRow(row, meta, data, "");
+	            	}       
+	            }
+	            
+	      
+            }
+            
+            putOutRow(row, meta, data, "#");
+            putOutRow(row, meta, data, "# Data Set 1");
+            putOutRow(row, meta, data, "#");
+            
+            putOutRow(row, meta, data, "");
+        }
 
-		}
+        // Logica do step: leitura de campos de entrada
 
-		putOutRow(row, meta, data, "ex:ob" + i + " a cube:Observation;", 
-				                   "    cube:dataSet ex:dataset;");
+        
+        // Add data properties
+        
+		putOutRow(row, meta, data, "ex:obj" + j + " a cube:Observation ;");
+        putOutRow(row, meta, data, "	cube:dataSet ex:dataset ;");
+        
+        DataTable<String> table = meta.getMapTable();
+        for (int i = 0; i < table.size(); i++)
+        {
+        	String dimensionField = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_DIMENSIONS_FIELD_NAME.name());
+            String dimension = getInputRowMeta().getString(row, dimensionField, "");
+            if (!dimension.startsWith("http")){
+            	 putOutRow(row, meta, data, "	exProp:"+removeSignals(dimensionField).toLowerCase()+" " + "\"" + dimension + "\" ;");
+            }else{putOutRow(row, meta, data, "	exProp:"+removeSignals(dimensionField).toLowerCase()+" " + "<" + dimension + "> ;");}
+        }
+        
+        putOutRow(row, meta, data, "	exProp:unit \""+ meta.getunity() + "\" ;");
+        
+        table = meta.getMapTable1();
+        for (int i = 0; i < table.size(); i++)
+        {
+        	String measureField = table.getValue(i,DataCubeStepMeta.Field.MAP_TABLE_MEASURE_FIELD_NAME.name());
+            String measure = getInputRowMeta().getString(row, measureField, "");
+            putOutRow(row, meta, data, "	exProp:"+removeSignals(measureField).toLowerCase()+" " + "\"" + measure + "\" ;");
+        }
+        
+        putOutRow(row, meta, data, "	rdfs:label \"\" .");
+        putOutRow(row, meta, data, "");
+       
+        j++;
 
-		DataTable<String> dimensionTable = meta.getDimensionTable();
-		for (int k = 0; k < dimensionTable.size(); k++) {
-			String dimName = dimensionTable.getValue(k, DataCubeStepMeta.Field.DIMENSION_TABLE_NAME.name());
-			String type = dimensionTable.getValue(k, DataCubeStepMeta.Field.DIMENSION_TABLE_TYPE.name());
-			String label = dimensionTable.getValue(k, DataCubeStepMeta.Field.DIMENSION_TABLE_LABEL.name());
-			if (type.trim().equals("")) {
-				putOutRow(row, meta, data, "    " + String.format(OBJ, dimName, getInputRowMeta().getString(row, dimName, "")));
-			} else {
-				putOutRow(row, meta, data, 
-						"    exProp:unit \"" + label + "\";",
-						"    exProp:value \"" + getInputRowMeta().getString(row, dimName, "") + "\"^^" + type + ";");
-			}
-		}
+        
+        return true;
+    }
 
-		putOutRow(row, meta, data, "    rdfs:label \"\".", "");
+    private void putOutRow(Object[] inputRow,
+            DataCubeStepMeta meta,
+            DataCubeStepData data, String temp) throws KettleStepException
+    {
 
-		i++;
-		return true;
-	}
+        int outputRowPos = 0;
+        Object[] outputRow = null;
 
-	private void putOutRow(Object[] inputRow, DataCubeStepMeta meta, DataCubeStepData data, String... lines)
-			throws KettleStepException {
-		for (String arg : lines) {
-			Object[] outputRow = null;
-			outputRow = meta.isKeepInputFields() ? inputRow : new Object[0];
-			outputRow = RowDataUtil.addValueData(outputRow, outputRow.length, arg);
-			putRow(data.outputRowMeta, outputRow);
-		}
-	}
+        // Determina se deve repassar campos de entrada
 
+        outputRow = inputRow;
+        outputRowPos = getInputRowMeta().size();
+        outputRow = new Object[3];
+        
+        outputRow = RowDataUtil
+                .addValueData(outputRow, outputRowPos++, temp);
+        // Coloca linha no fluxo
+        putRow(data.outputRowMeta, outputRow);
+    }
+    
+
+    
+	private static String removeSignals(String value)
+    {
+        if (value != null)
+        {
+            return value.replaceAll("á", "a").replaceAll("à", "a").replaceAll("ä", "a").replaceAll("ã", "a").
+            		replaceAll("ú", "u").replaceAll("ù", "u").replaceAll("é", "e").replaceAll("è", "e").replaceAll("ó", "o").
+            		replaceAll("ò", "o").replaceAll("ú", "u").replaceAll("ç", "c").replaceAll("í", "i").replaceAll("ì", "i").
+            		replaceAll(" ", "").trim();
+        }
+        else
+        {
+            return "";
+        }
+    }
+    
 }
